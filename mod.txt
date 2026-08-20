@@ -39,5 +39,13 @@
             "hook_id": "lib/managers/usermanager",
             "script_path": "lua/hooks/usermanager.lua"
         }
+        ],
+            "updates": [
+        {
+            "identifier": "lukituki6_seamless_input_switch_pd2",
+            "host": {
+                "meta": "https://raw.githubusercontent.com/Lukituki6/Seamless-Input-Switch-PD2-Mod/main/meta.json"
+            }
+        }
     ]
 }
