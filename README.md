@@ -51,9 +51,9 @@ The gamepad switch threshold can be increased if stick drift changes the active 
 
 * **PC / current keyboard bindings** - the existing keyboard and mouse labels;
 * **A/B/X/Y** - glyphs from PAYDAY 2's built-in PC font, resolved from the live gamepad layout and the mod's custom bindings;
-* **CIRCLE, SQUARE, CROSS, TRIANGLE (text)** - short safe labels such as `\\\\\\\[R1]`, `\\\\\\\[L2]`, `\\\\\\\[X]`, `\\\\\\\[O]`, `\\\\\\\[SQ]`, and `\\\\\\\[TRI]`.
+* **CIRCLE, SQUARE, CROSS, TRIANGLE (text)** - short safe labels such as `[R1]`, `[L2]`, `[X]`, `[O]`, `[SQ]`, and `[TRI]`.
 
-This setting is fixed and never changes `is\\\\\\\_pc\\\\\\\_controller()`, the wrapper type, or the controller id. It therefore cannot reactivate the native `MenuSceneGui` path that caused the earlier access violation game crash. Full graphical **CIRCLE, SQUARE, CROSS, TRIANGLE (text)** glyphs are not present in the stock PC button font and would require binary font-asset replacement, so this safe build uses text labels.
+This setting is fixed and never changes `is pc controller()`, the wrapper type, or the controller id. It therefore cannot reactivate the native `MenuSceneGui` path that caused the earlier access violation game crash. Full graphical **CIRCLE, SQUARE, CROSS, TRIANGLE (text)** glyphs are not present in the stock PC button font and would require binary font-asset replacement, so this safe build uses text labels.
 
 ## Gamepad camera settings
 
