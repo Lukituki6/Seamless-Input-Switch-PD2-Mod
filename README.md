@@ -10,7 +10,7 @@ Author: **Lukituki6**
 
 Seamless Input Switch lets the local player move freely between keyboard/mouse and gamepad while PAYDAY 2 is running, in both offline and online heists.
 
-This release has no automatic updater. Installation and future updates are manual.
+~~This release has no automatic updater. Installation and future updates are manual.~~ **done**
 
 I only own a DualSense Edge, so I haven’t been able to test other controllers. **They should work too, though (hopefully)**.
 
