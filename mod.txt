@@ -2,7 +2,7 @@
     "name": "Seamless Input Switch",
     "description": "Switch freely between keyboard/mouse and gamepad in online and offline mode without restarting your game.",
     "author": "Lukituki6",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "priority": 100,
     "blt_version": 2,
     "vr_disabled": true,
@@ -10,6 +10,10 @@
         {
             "hook_id": "core/lib/managers/controller/corecontrollermanager",
             "script_path": "lua/hooks/corecontrollermanager.lua"
+        },
+        {
+            "hook_id": "lib/managers/rumblemanager",
+            "script_path": "lua/hooks/rumblemanager.lua"
         },
         {
             "hook_id": "lib/managers/menu/menuinput",
