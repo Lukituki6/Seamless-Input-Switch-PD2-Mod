@@ -23,6 +23,8 @@
     "sis_gamepad_look_deadzone_desc": "Ignore small right-stick movement. Increase this if the camera drifts, or lower it for a more immediate response.",
     "sis_gamepad_invert_y_title": "Invert gamepad vertical look",
     "sis_gamepad_invert_y_desc": "Off: pushing the stick up looks up. On: use inverted flight-style vertical look.",
+    "sis_controller_vibration_title": "Controller vibration",
+    "sis_controller_vibration_desc": "Allow PAYDAY 2 rumble effects on the connected gamepad. Disabling this stops active vibration; the game's own vibration setting must also be enabled.",
     "sis_force_aim_assist_title": "Always-on aim assist",
     "sis_force_aim_assist_desc": "Enable the mod-managed ADS snap and sticky aim independently of the selected prompt style. ADS snap also applies to keyboard and mouse.",
     "sis_aim_assist_menu_title": "Aim-assist tuning",
