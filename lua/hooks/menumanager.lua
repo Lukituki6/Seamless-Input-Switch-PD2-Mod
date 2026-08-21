@@ -71,6 +71,19 @@ Hooks:Add("MenuManagerInitialize", "SIS_MenuManagerInitialize", function()
     MenuCallbackHandler.sis_aim_assist_snap_enabled = toggle_callback("aim_assist_snap_enabled")
     MenuCallbackHandler.sis_gamepad_invert_y = toggle_callback("gamepad_invert_y")
 
+    MenuCallbackHandler.sis_controller_vibration = function(self, item)
+        local value = item:value() == "on"
+
+        if SIS.settings.controller_vibration ~= value then
+            SIS.settings.controller_vibration = value
+            settings_dirty = true
+
+            if not value and managers and managers.rumble and managers.rumble.stop then
+                managers.rumble:stop("all")
+            end
+        end
+    end
+
     MenuCallbackHandler.sis_custom_gamepad_bindings = function(self, item)
         local value = item:value() == "on"
 
@@ -174,6 +187,7 @@ Hooks:Add("MenuManagerInitialize", "SIS_MenuManagerInitialize", function()
         prompt_style = table.index_of(prompt_style_options, SIS.settings.prompt_style) or 1,
         force_aim_assist = SIS.settings.force_aim_assist,
         menu_mouse = SIS.settings.menu_mouse,
+        controller_vibration = SIS.settings.controller_vibration,
         axis_threshold = SIS.settings.axis_threshold,
         axis_change_threshold = SIS.settings.axis_change_threshold,
         gamepad_look_sensitivity = SIS.settings.gamepad_look_sensitivity,
