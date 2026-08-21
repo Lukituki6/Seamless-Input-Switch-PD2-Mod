@@ -3,7 +3,7 @@ if _G.SeamlessInputSwitch then
 end
 
 local SIS = {
-    VERSION = "1.0.1",
+    VERSION = "1.0.2",
     ARCHITECTURE = "single-vc-merged-input-pc-ui",
     UI_TYPE = "pc",
     DYNAMIC_UI = false,
@@ -81,6 +81,7 @@ local SIS = {
         bind_weapon_gadget = "d_down",
         bind_weapon_firemode = "d_right",
         menu_mouse = true,
+        controller_vibration = true,
         axis_threshold = 0.18,
         axis_change_threshold = 0.10,
         gamepad_look_sensitivity = 2.00,
@@ -656,11 +657,6 @@ function SIS:raw_button_activity(source_type, controller)
                 return self:set_active_type(source_type, "raw-button-list"), true, nil
             end
 
-            -- A successful pressed_list() result is authoritative for this
-            -- frame. Do not enumerate and query every physical button again.
-            -- Some HID/Steam Input backends can stall PAYDAY 2's main thread
-            -- when num_buttons(), button_name(), pressed() and down() are all
-            -- called for every button on every rendered frame.
             return false, true, nil
         end
     end
