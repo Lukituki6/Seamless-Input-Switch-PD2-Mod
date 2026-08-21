@@ -5,7 +5,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Version: **1.0.1**  
+Version: **1.0.2**  
 Author: **Lukituki6**
 
 [Changelog](CHANGELOG.md)
@@ -48,6 +48,10 @@ The English interface is loaded by default. If PAYDAY2 is running in Polish, the
 * **Force gamepad semantics** - locks camera/detection behavior to gamepad and falls back to PC semantics if the pad disconnects.
 
 The gamepad switch threshold can be increased if stick drift changes the active device unexpectedly. Its default value is `0.18`. A separate axis-change threshold (`0.10`) controls how much an already displaced stick must change before it counts as new activity.
+
+## Controller vibration
+
+PAYDAY 2 controller vibration is restored by routing rumble effects to the physical gamepad. It can be enabled or disabled under `Options > Mod Options > Seamless Input Switch` and is enabled by default.
 
 ## Displayed control prompts
 
