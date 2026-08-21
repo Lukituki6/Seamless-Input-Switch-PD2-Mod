@@ -185,6 +185,96 @@ local function controller_has_input(controller, input_name)
     return ok and available and true or false
 end
 
+local PAD_INPUT_ALIAS_GROUPS = {
+    { "a", "cross", "face_down" },
+    { "b", "circle", "face_right" },
+    { "x", "square", "face_left" },
+    { "y", "triangle", "face_up" },
+    { "start", "options" }
+}
+
+-- PAYDAY 2 keeps the stats screen on the controller's non-configurable
+-- Select/View/Share-style button. Different native and Steam Input backends
+-- expose that physical control under different names, so only this one game
+-- connection receives the available aliases. They are deliberately not part
+-- of the custom gameplay binding list.
+local FIXED_STATS_SCREEN_INPUTS = {
+    "back",
+    "select",
+    "view",
+    "share",
+    "touchpad",
+    "touchpad_click",
+    "touchpad_press",
+    "touchpad_left"
+}
+
+-- The hybrid wrapper intentionally keeps TYPE="pc", so PAYDAY 2 registers a
+-- PC-only toggle_chat trigger on the controller named "MenuManager". Copying
+-- the gamepad source for that one connection would make the pad's
+-- Select/View/Share-style button open chat instead of behaving like the
+-- vanilla stats button. Other menu controllers keep their normal gamepad chat
+-- route, and the MenuManager wrapper keeps its original keyboard chat route.
+local function should_suppress_hybrid_pad_connection(wrapper, connection_name)
+    if connection_name ~= "toggle_chat" then
+        return false
+    end
+
+    local wrapper_name = wrapper.get_name and wrapper:get_name() or wrapper._name
+
+    return wrapper_name == "MenuManager"
+end
+
+local PAD_INPUT_ALIASES = {}
+
+for _, alias_group in ipairs(PAD_INPUT_ALIAS_GROUPS) do
+    for _, input_name in ipairs(alias_group) do
+        PAD_INPUT_ALIASES[input_name] = alias_group
+    end
+end
+
+local function resolve_physical_input(pad_type, input_name, controller)
+    local mapped_input = map_special_input(pad_type, input_name)
+
+    if controller_has_input(controller, mapped_input) then
+        return mapped_input
+    end
+
+    for _, alias in ipairs(PAD_INPUT_ALIASES[mapped_input] or PAD_INPUT_ALIASES[input_name] or {}) do
+        if alias ~= mapped_input and controller_has_input(controller, alias) then
+            return alias
+        end
+    end
+
+    return mapped_input
+end
+
+local function fixed_stats_screen_inputs(input_names, controller)
+    local result = {}
+    local seen = {}
+
+    local function add_if_available(input_name)
+        local input_key = type(input_name) .. ":" .. tostring(input_name)
+
+        if not seen[input_key] and controller_has_input(controller, input_name) then
+            seen[input_key] = true
+            table.insert(result, input_name)
+        end
+    end
+
+    for _, input_name in ipairs(input_names or {}) do
+        add_if_available(input_name)
+    end
+
+    for _, input_name in ipairs(FIXED_STATS_SCREEN_INPUTS) do
+        add_if_available(input_name)
+    end
+
+    -- Preserve the live vanilla route if this backend cannot report its
+    -- physical button catalogue during controller creation.
+    return #result > 0 and result or input_names
+end
+
 local function attach_pad_bindings(wrapper)
     if not BaseWrapperClass or not BaseWrapperClass.virtual_connect2 or not wrapper or not wrapper._sis_hybrid then
         return false, 0, 0
@@ -210,6 +300,7 @@ local function attach_pad_bindings(wrapper)
     local skipped_count = 0
     local failed_count = 0
     local custom_count = 0
+    local suppressed_count = 0
     local seen_connections = {}
 
     for _, connection_name in ipairs(pad_setup:get_connection_list()) do
@@ -219,15 +310,26 @@ local function attach_pad_bindings(wrapper)
             local pad_connection = pad_connection_map[connection_name]
             local pc_connection = pc_connection_map[connection_name]
             local debug_only = pad_connection and pad_connection.get_debug and pad_connection:get_debug()
+            local suppress_pad_source = should_suppress_hybrid_pad_connection(wrapper, connection_name)
 
-            if pad_connection and pc_connection and not debug_only and wrapper.connection_exist and wrapper:connection_exist(connection_name) then
+            if suppress_pad_source then
+                suppressed_count = suppressed_count + 1
+            end
+
+            if pad_connection and pc_connection and not debug_only and not suppress_pad_source and wrapper.connection_exist and wrapper:connection_exist(connection_name) then
                 local seen_inputs = {}
                 local input_names = pad_connection:get_input_name_list()
                 local custom_input = SIS:get_custom_gamepad_binding(connection_name, pad_type)
 
+                if connection_name == "stats_screen" then
+                    input_names = fixed_stats_screen_inputs(input_names, pad_controller)
+                end
+
                 if custom_input then
-                    if controller_has_input(pad_controller, custom_input) then
-                        input_names = { custom_input }
+                    local resolved_custom_input = resolve_physical_input(pad_type, custom_input, pad_controller)
+
+                    if controller_has_input(pad_controller, resolved_custom_input) then
+                        input_names = { resolved_custom_input }
                         custom_count = custom_count + 1
                     else
                         local warning_key = tostring(pad_type) .. ":" .. tostring(custom_input)
@@ -242,7 +344,7 @@ local function attach_pad_bindings(wrapper)
                 end
 
                 for _, input_name in ipairs(input_names) do
-                    local mapped_input = map_special_input(pad_type, input_name)
+                    local mapped_input = resolve_physical_input(pad_type, input_name, pad_controller)
                     local input_key = type(mapped_input) .. ":" .. tostring(mapped_input)
 
                     if not seen_inputs[input_key] then
@@ -277,6 +379,7 @@ local function attach_pad_bindings(wrapper)
     wrapper._sis_pad_binding_skipped = skipped_count
     wrapper._sis_pad_binding_failed = failed_count
     wrapper._sis_custom_binding_count = custom_count
+    wrapper._sis_pad_binding_suppressed = suppressed_count
 
     return connected_count > 0, connected_count, skipped_count
 end
