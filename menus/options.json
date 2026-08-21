@@ -101,6 +101,14 @@
         },
         {
             "type": "toggle",
+            "id": "sis_controller_vibration",
+            "title": "sis_controller_vibration_title",
+            "description": "sis_controller_vibration_desc",
+            "callback": "sis_controller_vibration",
+            "value": "controller_vibration"
+        },
+        {
+            "type": "toggle",
             "id": "sis_force_aim_assist",
             "title": "sis_force_aim_assist_title",
             "description": "sis_force_aim_assist_desc",
