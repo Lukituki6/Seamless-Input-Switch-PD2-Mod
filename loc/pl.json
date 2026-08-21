@@ -23,6 +23,8 @@
     "sis_gamepad_look_deadzone_desc": "Ignoruje drobne wychylenia prawego analoga. Zwiększ wartość, jeśli kamera sama się porusza; zmniejsz dla szybszej reakcji.",
     "sis_gamepad_invert_y_title": "Odwróć pion prawego analoga",
     "sis_gamepad_invert_y_desc": "Wyłączone: wychylenie analoga w górę kieruje kamerę w górę. Włączone: odwrócone sterowanie lotnicze.",
+    "sis_controller_vibration_title": "Wibracje kontrolera",
+    "sis_controller_vibration_desc": "Zezwala na efekty wibracji PAYDAY 2 na podłączonym padzie. Wyłączenie zatrzymuje trwające wibracje; wbudowana opcja wibracji gry również musi być włączona.",
     "sis_force_aim_assist_title": "Aim assist zawsze włączony",
     "sis_force_aim_assist_desc": "Włącza obsługiwane przez mod przyciąganie ADS i sticky aim niezależnie od wybranego stylu kontrolek. Przyciąganie ADS działa też na klawiaturze i myszy.",
     "sis_aim_assist_menu_title": "Dostosowanie aim assistu",
