@@ -2,6 +2,17 @@
 
 All notable changes to Seamless Input Switch are documented here.
 
+## [1.0.2] - 2026-08-21
+
+### Added
+
+- Added a Controller vibration option under Mod Options.
+- Controller vibration is enabled by default and can be changed without restarting the game.
+
+### Fixed
+
+- Restored PAYDAY 2 controller vibration by routing rumble effects to the physical gamepad used by the hybrid input wrapper.
+  
 ## [1.0.1] - 2026-08-21
 
 ### Fixed
