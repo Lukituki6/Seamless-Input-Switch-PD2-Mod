@@ -3,7 +3,7 @@ if _G.SeamlessInputSwitch then
 end
 
 local SIS = {
-    VERSION = "1.0.0",
+    VERSION = "1.0.1",
     ARCHITECTURE = "single-vc-merged-input-pc-ui",
     UI_TYPE = "pc",
     DYNAMIC_UI = false,
@@ -102,6 +102,8 @@ local SIS = {
     wrappers = setmetatable({}, { __mode = "k" }),
     raw_axis_state = setmetatable({}, { __mode = "k" }),
     raw_button_state = setmetatable({}, { __mode = "k" }),
+    raw_axis_catalog = setmetatable({}, { __mode = "k" }),
+    raw_button_catalog = setmetatable({}, { __mode = "k" }),
     _pointer_syncing = false,
     _aim_assist_scope = false,
     _gamepad_semantics_scope = false
@@ -597,8 +599,44 @@ local function raw_button_value(controller, method_name, index, name)
     return ok, ok and not not value or nil
 end
 
+function SIS:get_raw_button_catalog(controller)
+    local catalog = self.raw_button_catalog[controller]
+
+    if catalog then
+        return catalog
+    end
+
+    local button_count = raw_controller_count(controller, "num_buttons")
+
+    if button_count == nil then
+        return nil
+    end
+
+    catalog = {}
+
+    for index = 0, button_count - 1 do
+        table.insert(catalog, {
+            index = index,
+            name = raw_button_name(controller, index)
+        })
+    end
+
+    self.raw_button_catalog[controller] = catalog
+
+    return catalog
+end
+
 function SIS:raw_button_activity(source_type, controller)
-    if not raw_controller_connected(controller) or not self:is_type_allowed(source_type) then
+    if not raw_controller_connected(controller) then
+        if controller then
+            self.raw_button_state[controller] = nil
+            self.raw_button_catalog[controller] = nil
+        end
+
+        return false, false, nil
+    end
+
+    if not self:is_type_allowed(source_type) then
         return false, false, nil
     end
 
@@ -617,12 +655,19 @@ function SIS:raw_button_activity(source_type, controller)
             if pressed_count > 0 then
                 return self:set_active_type(source_type, "raw-button-list"), true, nil
             end
+
+            -- A successful pressed_list() result is authoritative for this
+            -- frame. Do not enumerate and query every physical button again.
+            -- Some HID/Steam Input backends can stall PAYDAY 2's main thread
+            -- when num_buttons(), button_name(), pressed() and down() are all
+            -- called for every button on every rendered frame.
+            return false, true, nil
         end
     end
 
-    local button_count = raw_controller_count(controller, "num_buttons")
+    local button_catalog = self:get_raw_button_catalog(controller)
 
-    if button_count == nil then
+    if not button_catalog then
         return false, readable, nil
     end
 
@@ -633,12 +678,17 @@ function SIS:raw_button_activity(source_type, controller)
         self.raw_button_state[controller] = button_state
     end
 
-    for index = 0, button_count - 1 do
-        local name = raw_button_name(controller, index)
+    for _, button in ipairs(button_catalog) do
+        local index = button.index
+        local name = button.name
         local state_key = tostring(name or index)
-        local pressed_ok, pressed = raw_button_value(controller, "pressed", index, name)
         local down_ok, down = raw_button_value(controller, "down", index, name)
         local previous = button_state[state_key]
+        local pressed_ok, pressed = false, nil
+
+        if not down_ok then
+            pressed_ok, pressed = raw_button_value(controller, "pressed", index, name)
+        end
 
         readable = readable or pressed_ok or down_ok
 
@@ -648,22 +698,66 @@ function SIS:raw_button_activity(source_type, controller)
             button_state[state_key] = pressed
         end
 
-        if pressed or down and previous == false then
-            return self:set_active_type(source_type, "raw-button:" .. state_key), readable, button_count
+        if pressed or down and previous ~= true then
+            return self:set_active_type(source_type, "raw-button:" .. state_key), readable, #button_catalog
         end
     end
 
-    return false, readable, button_count
+    return false, readable, #button_catalog
 end
 
-function SIS:raw_axis_activity(source_type, controller)
-    if not raw_controller_connected(controller) or not controller.num_axes or not controller.axis or not self:is_type_allowed(source_type) then
-        return false, false, nil
+function SIS:get_raw_axis_catalog(controller)
+    local catalog = self.raw_axis_catalog[controller]
+
+    if catalog then
+        return catalog
     end
 
     local axis_count = raw_controller_count(controller, "num_axes")
 
     if axis_count == nil then
+        return nil
+    end
+
+    catalog = {}
+
+    for index = 0, axis_count - 1 do
+        local name_ok, axis_name = false, nil
+
+        if controller.axis_name then
+            name_ok, axis_name = pcall(function()
+                return controller:axis_name(index)
+            end)
+        end
+
+        table.insert(catalog, {
+            index = index,
+            name = name_ok and axis_name or nil
+        })
+    end
+
+    self.raw_axis_catalog[controller] = catalog
+
+    return catalog
+end
+
+function SIS:raw_axis_activity(source_type, controller)
+    if not raw_controller_connected(controller) then
+        if controller then
+            self.raw_axis_state[controller] = nil
+            self.raw_axis_catalog[controller] = nil
+        end
+
+        return false, false, nil
+    end
+
+    if not controller.num_axes or not controller.axis or not self:is_type_allowed(source_type) then
+        return false, false, nil
+    end
+
+    local axis_catalog = self:get_raw_axis_catalog(controller)
+
+    if not axis_catalog then
         return false, false, nil
     end
 
@@ -679,18 +773,13 @@ function SIS:raw_axis_activity(source_type, controller)
     local change_threshold = family == "pc" and 0.001 or self.settings.axis_change_threshold
     local readable = false
 
-    for index = 0, axis_count - 1 do
-        local name_ok, axis_name = false, nil
-
-        if controller.axis_name then
-            name_ok, axis_name = pcall(function()
-                return controller:axis_name(index)
-            end)
-        end
+    for _, axis_data in ipairs(axis_catalog) do
+        local index = axis_data.index
+        local axis_name = axis_data.name
 
         local axis_ok, axis = false, nil
 
-        if name_ok and axis_name then
+        if axis_name then
             axis_ok, axis = pcall(function()
                 return controller:axis(axis_name)
             end)
@@ -727,12 +816,12 @@ function SIS:raw_axis_activity(source_type, controller)
             }
 
             if active and (became_active or changed_enough) then
-                return self:set_active_type(source_type, "raw-axis:" .. state_key), readable, axis_count
+                return self:set_active_type(source_type, "raw-axis:" .. state_key), readable, #axis_catalog
             end
         end
     end
 
-    return false, readable, axis_count
+    return false, readable, #axis_catalog
 end
 
 function SIS:poll_raw_controller(source_type, controller)
