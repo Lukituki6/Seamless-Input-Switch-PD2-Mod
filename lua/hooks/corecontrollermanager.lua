@@ -193,11 +193,7 @@ local PAD_INPUT_ALIAS_GROUPS = {
     { "start", "options" }
 }
 
--- PAYDAY 2 keeps the stats screen on the controller's non-configurable
--- Select/View/Share-style button. Different native and Steam Input backends
--- expose that physical control under different names, so only this one game
--- connection receives the available aliases. They are deliberately not part
--- of the custom gameplay binding list.
+
 local FIXED_STATS_SCREEN_INPUTS = {
     "back",
     "select",
@@ -209,12 +205,7 @@ local FIXED_STATS_SCREEN_INPUTS = {
     "touchpad_left"
 }
 
--- The hybrid wrapper intentionally keeps TYPE="pc", so PAYDAY 2 registers a
--- PC-only toggle_chat trigger on the controller named "MenuManager". Copying
--- the gamepad source for that one connection would make the pad's
--- Select/View/Share-style button open chat instead of behaving like the
--- vanilla stats button. Other menu controllers keep their normal gamepad chat
--- route, and the MenuManager wrapper keeps its original keyboard chat route.
+
 local function should_suppress_hybrid_pad_connection(wrapper, connection_name)
     if connection_name ~= "toggle_chat" then
         return false
@@ -270,8 +261,7 @@ local function fixed_stats_screen_inputs(input_names, controller)
         add_if_available(input_name)
     end
 
-    -- Preserve the live vanilla route if this backend cannot report its
-    -- physical button catalogue during controller creation.
+
     return #result > 0 and result or input_names
 end
 
@@ -302,6 +292,8 @@ local function attach_pad_bindings(wrapper)
     local custom_count = 0
     local suppressed_count = 0
     local seen_connections = {}
+
+    wrapper._sis_pad_merged_connections = wrapper._sis_pad_merged_connections or {}
 
     for _, connection_name in ipairs(pad_setup:get_connection_list()) do
         if not seen_connections[connection_name] then
@@ -362,6 +354,7 @@ local function attach_pad_bindings(wrapper)
 
                         if ok then
                             connected_count = connected_count + 1
+                            wrapper._sis_pad_merged_connections[connection_name] = true
                         else
                             failed_count = failed_count + 1
                             SIS:log("Could not merge " .. tostring(pad_type) .. " input '" .. tostring(mapped_input) .. "' into '" .. tostring(connection_name) .. "': " .. tostring(error_message))
@@ -395,6 +388,7 @@ local function install_rebind_bridge(wrapper)
 
     wrapper.rebind_connections = function(self, ...)
         self._sis_pad_bindings_attached = false
+        self._sis_pad_merged_connections = {}
 
         local result = pack(pcall(original_rebind_connections, self, ...))
 
