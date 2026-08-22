@@ -2,6 +2,28 @@
 
 All notable changes to Seamless Input Switch are documented here.
 
+## [1.1.0] - 2026-08-22
+
+### Added
+
+- Added isolated gamepad cursor control on Crime.net.
+- Added right-stick character rotation and left-stick item rotation in supported menu previews.
+- Restored gamepad menu and lobby shortcuts that are normally available only in PAYDAY 2's native controller mode.
+- Restored the controller shortcut for buying all available mission assets.
+- Restored controller shortcuts for opening, selecting, and moving player profiles.
+
+### Fixed
+
+- Fixed inverted vertical right-stick movement while viewing security-camera feeds.
+- Fixed a crash caused by moving the mouse while simultaneously rotating a menu character or item with a controller.
+
+### Known Issues
+**In my opinion, these issues are not game-breaking, so I’ll address them in a future patch if possible.**
+
+- Selecting Contract Broker on Crime.net with a controller may cause the Contract Broker interface to display incorrectly. Until this is fixed, **using mouse and keyboard in menus and lobbies is recommended.**
+- Moving the mouse while simultaneously rotating a character or weapon with a controller may cause the game to behave as though the left mouse button is **still being held**. **Click either the left or right mouse button once to release it.** This workaround is currently required to prevent the game from crashing.
+- Controller input may stop responding if you press **Escape or open the pause menu** while on the **pre-planning screen**. To restore controller input, **use your mouse and keyboard and click Ready.**
+
 ## [1.0.2] - 2026-08-21
 
 ### Added
@@ -29,4 +51,3 @@ All notable changes to Seamless Input Switch are documented here.
 ## [1.0.0] - 2026-08-20
 
 - Initial public release.
-
