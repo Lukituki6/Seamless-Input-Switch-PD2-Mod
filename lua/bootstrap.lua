@@ -3,7 +3,7 @@ if _G.SeamlessInputSwitch then
 end
 
 local SIS = {
-    VERSION = "1.0.2",
+    VERSION = "1.1.0",
     ARCHITECTURE = "single-vc-merged-input-pc-ui",
     UI_TYPE = "pc",
     DYNAMIC_UI = false,
