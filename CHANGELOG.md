@@ -2,6 +2,25 @@
 
 All notable changes to Seamless Input Switch are documented here.
 
+## [1.1.1] - 2026-10-26
+
+### Fixed
+
+- Improved controller navigation on Crime.net and fixed issues that could occur when opening Contract Broker.
+- Improved switching between mouse and controller while rotating characters, weapons and other items in menus.
+- Fixed several situations where the game could think the left mouse button was still being held after using a controller.
+- Improved vertical camera movement on controllers, including security cameras.
+- Improved PlayStation button labels, including OPTIONS, SHARE, CREATE and TOUCHPAD.
+- Improved automatic input switching to prevent unnecessary switches caused by mouse movement or controller drift.
+- Improved controller detection when multiple input devices are available.
+- Fixed an issue where the wrong controller button could be selected for the in-game stats screen.
+
+### Improved
+
+- Settings are now saved more safely, with a backup available if something goes wrong.
+- Fixed an issue where settings could be lost after a failed save.
+- Improved controller detection after disconnecting a device.
+
 ## [1.1.0] - 2026-08-22
 
 ### Added
