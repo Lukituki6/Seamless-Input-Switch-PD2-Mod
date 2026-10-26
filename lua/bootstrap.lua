@@ -3,7 +3,7 @@ if _G.SeamlessInputSwitch then
 end
 
 local SIS = {
-    VERSION = "1.1.0",
+    VERSION = "1.1.1",
     ARCHITECTURE = "single-vc-merged-input-pc-ui",
     UI_TYPE = "pc",
     DYNAMIC_UI = false,
@@ -147,11 +147,21 @@ local function pack(...)
 end
 
 function SIS:log(message, verbose_only)
-    if verbose_only then
+    if verbose_only and not self.settings.verbose_logging then
         return
     end
 
     local line = "[Seamless Input Switch] " .. tostring(message)
+
+    if not verbose_only then
+        self._logged_messages = self._logged_messages or {}
+
+        if self._logged_messages[line] then
+            return
+        end
+
+        self._logged_messages[line] = true
+    end
 
     if _G.log then
         _G.log(line)
@@ -160,30 +170,57 @@ function SIS:log(message, verbose_only)
     end
 end
 
+local function read_settings_file(path)
+    local opened, file, open_error, open_code = pcall(io.open, path, "rb")
+
+    if not opened or not file then
+        return nil, opened and open_error or file, opened and open_code or nil
+    end
+
+    local read_ok, contents = pcall(file.read, file, "*all")
+    local close_ok, closed = pcall(file.close, file)
+
+    if not read_ok or type(contents) ~= "string" or not close_ok or not closed then
+        return nil, "File read or close failed."
+    end
+
+    return contents
+end
+
+local function decode_settings(contents)
+    if type(contents) ~= "string" or not json or not json.decode then
+        return nil
+    end
+
+    local ok, decoded = pcall(json.decode, contents)
+
+    return ok and type(decoded) == "table" and decoded or nil
+end
+
 function SIS:load_settings()
     self.settings = shallow_copy(self.DEFAULTS)
 
-    local file = io.open(self.SAVE_FILE, "r")
+    local contents, read_error, read_code = read_settings_file(self.SAVE_FILE)
+    local decoded = decode_settings(contents)
 
-    if file then
-        local contents = file:read("*all")
+    if not decoded then
+        local backup = read_settings_file(self.SAVE_FILE .. ".bak")
 
-        file:close()
+        decoded = decode_settings(backup)
 
-        local ok, decoded = false, nil
-
-        if json and json.decode then
-            ok, decoded = pcall(json.decode, contents)
+        if decoded then
+            self._settings_from_backup = true
+            self:log("Settings recovered from the backup file.")
+        elseif contents or read_code ~= 2 then
+            self:log("Settings could not be read; defaults are in memory. Existing files were left unchanged: " .. tostring(read_error or "Invalid JSON."))
         end
+    end
 
-        if ok and type(decoded) == "table" then
-            for key, default_value in pairs(self.DEFAULTS) do
-                if type(decoded[key]) == type(default_value) then
-                    self.settings[key] = decoded[key]
-                end
+    if decoded then
+        for key, default_value in pairs(self.DEFAULTS) do
+            if type(decoded[key]) == type(default_value) then
+                self.settings[key] = decoded[key]
             end
-        else
-             -- self:log("Could not read settings; defaults will be used.")
         end
     end
 
@@ -216,32 +253,93 @@ function SIS:load_settings()
 end
 
 function SIS:save_settings()
-    if not json or not json.encode then
-        -- self:log("JSON support is unavailable; settings were not saved.")
+    local function failed(reason)
+        self:log("Settings were not saved: " .. tostring(reason))
 
         return false
+    end
+
+    if not json or not json.encode or not json.decode then
+        return failed("JSON support is unavailable.")
     end
 
     local encoded_ok, encoded = pcall(json.encode, self.settings)
 
-    if not encoded_ok or type(encoded) ~= "string" then
-       --  self:log("Settings could not be encoded; the existing file was left unchanged: " .. tostring(encoded))
-
-        return false
+    if not encoded_ok or not decode_settings(encoded) then
+        return failed("Settings could not be encoded.")
     end
 
-    local file = io.open(self.SAVE_FILE, "w+")
+    local temp_path = self.SAVE_FILE .. ".tmp"
+    local backup_path = self.SAVE_FILE .. ".bak"
+    local opened, file = pcall(io.open, temp_path, "wb")
 
-    if not file then
-        -- self:log("Could not save settings to " .. tostring(self.SAVE_FILE))
-
-        return false
+    if not opened or not file then
+        return failed("Could not open the temporary file.")
     end
 
-    file:write(encoded)
-    file:close()
+    local wrote_ok, wrote = pcall(file.write, file, encoded)
+    local flushed_ok, flushed = pcall(file.flush, file)
+    local closed_ok, closed = pcall(file.close, file)
 
-    --self:log("Settings saved.", true)
+    if not wrote_ok or not wrote or not flushed_ok or not flushed or not closed_ok or not closed then
+        return failed("Temporary file write, flush or close failed.")
+    end
+
+    if read_settings_file(temp_path) ~= encoded then
+        return failed("Temporary file verification failed.")
+    end
+
+    local previous, previous_error, previous_code = read_settings_file(self.SAVE_FILE)
+
+    if not previous and previous_code ~= 2 then
+        return failed(previous_error or "Could not inspect the existing file.")
+    end
+
+    local moved_previous = false
+
+    if previous then
+        if not decode_settings(previous) then
+            return failed("The existing file contains invalid JSON. Keep it for recovery before saving again.")
+        end
+
+        local backup, backup_error, backup_code = read_settings_file(backup_path)
+
+        if not backup and backup_code ~= 2 then
+            return failed(backup_error or "Could not inspect the backup file.")
+        end
+
+        if backup then
+            local removed_ok, removed = pcall(os.remove, backup_path)
+
+            if not removed_ok or not removed then
+                return failed("Could not rotate the backup file.")
+            end
+        end
+
+        local moved_ok, moved = pcall(os.rename, self.SAVE_FILE, backup_path)
+
+        if not moved_ok or not moved then
+            return failed("Could not preserve the previous settings file.")
+        end
+
+        moved_previous = true
+    end
+
+    local renamed_ok, renamed = pcall(os.rename, temp_path, self.SAVE_FILE)
+
+    if not renamed_ok or not renamed then
+        if moved_previous then
+            local restored_ok, restored = pcall(os.rename, backup_path, self.SAVE_FILE)
+
+            if not restored_ok or not restored then
+                return failed("Could not restore the primary file. Previous settings remain in " .. backup_path)
+            end
+        end
+
+        return failed("Could not replace the settings file.")
+    end
+
+    self._settings_from_backup = nil
 
     return true
 end
@@ -419,14 +517,12 @@ function SIS:register_wrapper(wrapper, manager, pad_data, requested_index)
         self.active_family = self:family_for_type(self.active_type)
     end
 
-    -- self:log("Merged controller ready for '" .. tostring(wrapper.get_name and wrapper:get_name() or "unnamed") .. "'.", true)
 
     if not self._hybrid_ready_announced then
         self._hybrid_ready_announced = true
         local native_id = wrapper.get_id and wrapper:get_id() or "unknown"
 
-       self:log("Hybrid input ready: pc + " .. tostring(pad_data.type) .. " (" .. self.ARCHITECTURE .. "; native vc=ctrl_" .. tostring(native_id) .. ").")
-        --self:log("UI controller type locked to pc; aim assist is controlled independently.")
+       self:log("Hybrid input ready: pc + " .. tostring(pad_data.type) .. " (" .. self.ARCHITECTURE .. "; native vc=ctrl_" .. tostring(native_id) .. ").", true)
     end
 
     return true
@@ -476,7 +572,6 @@ function SIS:set_active_type(wrapper_type, reason, bypass_mode)
     self.active_family = family
 
     if changed then
-        -- self:log("Active input: " .. wrapper_type .. " (" .. tostring(reason or "unknown") .. ")")
 
         if self.DYNAMIC_UI then
             self:refresh_interaction_text()
@@ -627,17 +722,13 @@ function SIS:get_raw_button_catalog(controller)
     return catalog
 end
 
-function SIS:raw_button_activity(source_type, controller)
+function SIS:raw_button_activity(source_type, controller, track_only)
     if not raw_controller_connected(controller) then
         if controller then
             self.raw_button_state[controller] = nil
             self.raw_button_catalog[controller] = nil
         end
 
-        return false, false, nil
-    end
-
-    if not self:is_type_allowed(source_type) then
         return false, false, nil
     end
 
@@ -653,7 +744,7 @@ function SIS:raw_button_activity(source_type, controller)
         if ok then
             readable = true
 
-            if pressed_count > 0 then
+            if pressed_count > 0 and not track_only then
                 return self:set_active_type(source_type, "raw-button-list"), true, nil
             end
 
@@ -673,6 +764,8 @@ function SIS:raw_button_activity(source_type, controller)
         button_state = {}
         self.raw_button_state[controller] = button_state
     end
+
+    local activity_key
 
     for _, button in ipairs(button_catalog) do
         local index = button.index
@@ -695,8 +788,12 @@ function SIS:raw_button_activity(source_type, controller)
         end
 
         if pressed or down and previous ~= true then
-            return self:set_active_type(source_type, "raw-button:" .. state_key), readable, #button_catalog
+            activity_key = activity_key or state_key
         end
+    end
+
+    if activity_key and not track_only then
+        return self:set_active_type(source_type, "raw-button:" .. activity_key), readable, #button_catalog
     end
 
     return false, readable, #button_catalog
@@ -737,7 +834,7 @@ function SIS:get_raw_axis_catalog(controller)
     return catalog
 end
 
-function SIS:raw_axis_activity(source_type, controller)
+function SIS:raw_axis_activity(source_type, controller, track_only)
     if not raw_controller_connected(controller) then
         if controller then
             self.raw_axis_state[controller] = nil
@@ -747,7 +844,7 @@ function SIS:raw_axis_activity(source_type, controller)
         return false, false, nil
     end
 
-    if not controller.num_axes or not controller.axis or not self:is_type_allowed(source_type) then
+    if not controller.num_axes or not controller.axis then
         return false, false, nil
     end
 
@@ -768,6 +865,7 @@ function SIS:raw_axis_activity(source_type, controller)
     local threshold = family == "pc" and 0.001 or self.settings.axis_threshold
     local change_threshold = family == "pc" and 0.001 or self.settings.axis_change_threshold
     local readable = false
+    local activity_key
 
     for _, axis_data in ipairs(axis_catalog) do
         local index = axis_data.index
@@ -812,23 +910,27 @@ function SIS:raw_axis_activity(source_type, controller)
             }
 
             if active and (became_active or changed_enough) then
-                return self:set_active_type(source_type, "raw-axis:" .. state_key), readable, #axis_catalog
+                activity_key = activity_key or state_key
             end
         end
+    end
+
+    if activity_key and not track_only then
+        return self:set_active_type(source_type, "raw-axis:" .. activity_key), readable, #axis_catalog
     end
 
     return false, readable, #axis_catalog
 end
 
-function SIS:poll_raw_controller(source_type, controller)
-    local button_switched, buttons_readable, button_count = self:raw_button_activity(source_type, controller)
-    local axis_switched, axes_readable, axis_count = self:raw_axis_activity(source_type, controller)
+function SIS:poll_raw_controller(source_type, controller, track_only)
+    local button_switched, buttons_readable, button_count = self:raw_button_activity(source_type, controller, track_only)
+    local axis_switched, axes_readable, axis_count = self:raw_axis_activity(source_type, controller, track_only)
 
-    if self:is_gamepad_type(source_type) and not self._raw_watcher_announced then
+    if self:is_gamepad_type(source_type) and not self._raw_watcher_announced and raw_controller_connected(controller) then
         self._raw_watcher_announced = true
 
         if buttons_readable or axes_readable then
-            self:log("Inactive gamepad watcher ready: " .. tostring(source_type) .. " (buttons=" .. tostring(button_count or "list") .. ", axes=" .. tostring(axis_count or "unavailable") .. ").")
+            self:log("Inactive gamepad watcher ready: " .. tostring(source_type) .. " (buttons=" .. tostring(button_count or "list") .. ", axes=" .. tostring(axis_count or "unavailable") .. ").", true)
         else
             self:log("Inactive gamepad watcher could not read physical " .. tostring(source_type) .. " input.")
         end
@@ -842,34 +944,71 @@ function SIS:poll_wrapper(wrapper)
         return
     end
 
+    local raw_pad = self:get_pad_controller(wrapper)
     local pad = self:get_pad_controller(wrapper, true)
 
     if self.active_family == "gamepad" and not pad then
         self:set_active_type("pc", "gamepad-disconnected", true)
     end
 
-    if self.active_family == "gamepad" then
-        if Input and Input.keyboard and self:poll_raw_controller("pc", Input:keyboard()) then
-            return
-        end
+    local was_gamepad = self.active_family == "gamepad"
 
-        if Input and Input.mouse then
-            self:poll_raw_controller("pc", Input:mouse())
-        end
-    elseif pad then
-        self:poll_raw_controller(wrapper._sis_pad_type, pad)
+    if Input and Input.keyboard then
+        self:poll_raw_controller("pc", Input:keyboard(), not was_gamepad)
+    end
+
+    if Input and Input.mouse then
+        self:poll_raw_controller("pc", Input:mouse(), not was_gamepad)
+    end
+
+    if raw_pad then
+        self:poll_raw_controller(wrapper._sis_pad_type, raw_pad, was_gamepad or not pad)
     end
 end
 
 function SIS:poll_manager(manager)
-    for wrapper in pairs(self.wrappers) do
-        local same_manager = not manager or not wrapper._sis_manager or wrapper._sis_manager == manager
-
-        if same_manager and wrapper.enabled and wrapper:enabled() then
-            self:poll_wrapper(wrapper)
-
-            return
+    local function eligible(wrapper)
+        if not wrapper or not self.wrappers[wrapper] or not wrapper._sis_hybrid or not wrapper.enabled then
+            return false
         end
+
+        if manager and wrapper._sis_manager and wrapper._sis_manager ~= manager then
+            return false
+        end
+
+        local ok, enabled = pcall(wrapper.enabled, wrapper)
+
+        return ok and enabled and true or false
+    end
+
+    local input = self:get_menu_input()
+    local menu_wrapper = input and input._controller
+
+    if eligible(menu_wrapper) and self:get_pad_controller(menu_wrapper, true) then
+        self:poll_wrapper(menu_wrapper)
+
+        return
+    end
+
+    local selected
+    local selected_key
+    local selected_connected = false
+
+    for wrapper in pairs(self.wrappers) do
+        if eligible(wrapper) then
+            local connected = self:get_pad_controller(wrapper, true) ~= nil
+            local key = tostring(wrapper._id or wrapper._name or wrapper)
+
+            if not selected or connected and not selected_connected or connected == selected_connected and key < selected_key then
+                selected = wrapper
+                selected_key = key
+                selected_connected = connected
+            end
+        end
+    end
+
+    if selected then
+        self:poll_wrapper(selected)
     end
 end
 
@@ -978,4 +1117,4 @@ function SIS:call_with_gamepad_semantics(func, target, wrapper, ...)
 end
 
 SIS:load_settings()
-SIS:log("Loaded v" .. SIS.VERSION .. " (mode=" .. tostring(SIS.settings.mode) .. ", architecture=" .. SIS.ARCHITECTURE .. ").")
+SIS:log("Loaded v" .. SIS.VERSION .. " (mode=" .. tostring(SIS.settings.mode) .. ", architecture=" .. SIS.ARCHITECTURE .. ").", true)
