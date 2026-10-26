@@ -43,7 +43,7 @@ local function add_vanilla_gamepad_helpers(player, unit)
 
     if not SIS._vanilla_gameplay_helpers_announced then
         SIS._vanilla_gameplay_helpers_announced = true
-        SIS:log("Vanilla gamepad gameplay helpers active: interact/shout, bipod and secondary deployable.")
+        SIS:log("Vanilla gamepad gameplay helpers active: interact/shout, bipod and secondary deployable.", true)
     end
 end
 
