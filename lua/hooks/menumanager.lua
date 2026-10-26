@@ -167,18 +167,16 @@ Hooks:Add("MenuManagerInitialize", "SIS_MenuManagerInitialize", function()
 
     MenuCallbackHandler.sis_flush_settings = function()
         if settings_dirty then
-            SIS:save_settings()
-            settings_dirty = false
+            settings_dirty = not SIS:save_settings()
         end
 
         if bindings_dirty then
-            SIS:request_controller_rebind()
+            bindings_dirty = not SIS:request_controller_rebind()
 
             if SIS.refresh_prompt_display then
                 SIS:refresh_prompt_display()
             end
 
-            bindings_dirty = false
         end
     end
 
