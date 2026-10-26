@@ -257,8 +257,14 @@ local function fixed_stats_screen_inputs(input_names, controller)
         add_if_available(input_name)
     end
 
-    for _, input_name in ipairs(FIXED_STATS_SCREEN_INPUTS) do
-        add_if_available(input_name)
+    if #result == 0 then
+        for _, input_name in ipairs(FIXED_STATS_SCREEN_INPUTS) do
+            add_if_available(input_name)
+
+            if #result > 0 then
+                break
+            end
+        end
     end
 
 
@@ -465,7 +471,7 @@ local function create_merged_controller(manager, name, requested_index, prio)
 
         if not SIS._merged_bindings_announced then
             SIS._merged_bindings_announced = true
-            SIS:log("Single native controller active: merged " .. tostring(connection_count) .. " " .. tostring(pad_data.type) .. " input routes (skipped=" .. tostring(skipped_count) .. ").")
+            SIS:log("Single native controller active: merged " .. tostring(connection_count) .. " " .. tostring(pad_data.type) .. " input routes (skipped=" .. tostring(skipped_count) .. ").", true)
         end
     else
         SIS:log("No gamepad routes were merged into '" .. tostring(name) .. "'; this controller remains keyboard/mouse only.")
