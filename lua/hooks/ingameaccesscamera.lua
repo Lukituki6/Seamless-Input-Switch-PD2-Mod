@@ -16,7 +16,7 @@ local function pack(...)
     return { n = select("#", ...), ... }
 end
 
-local function connection_y_sign(connection)
+local function connection_y_sign(connection, normalize_user_inversion)
     if not connection or not connection.get_inversion then
         return nil
     end
@@ -33,7 +33,21 @@ local function connection_y_sign(connection)
         return nil
     end
 
-    return y < 0 and -1 or 1
+    local sign = y < 0 and -1 or 1
+
+    if normalize_user_inversion and connection.get_inversion_unmodified then
+        local user_ok, user_inversion = pcall(connection.get_inversion_unmodified, connection)
+
+        if user_ok and user_inversion then
+            local _, user_y = SIS:axis_components(user_inversion)
+
+            if math.abs(user_y) >= 0.001 then
+                sign = sign * (user_y < 0 and -1 or 1)
+            end
+        end
+    end
+
+    return sign
 end
 
 local function gamepad_vertical_correction(controller)
@@ -41,7 +55,7 @@ local function gamepad_vertical_correction(controller)
     local pc_look = pc_setup and pc_setup.get_connection and pc_setup:get_connection("look")
     local pad_look = SIS:get_pad_connection_settings(controller, "look")
     local pc_y_sign = connection_y_sign(pc_look)
-    local pad_y_sign = connection_y_sign(pad_look)
+    local pad_y_sign = connection_y_sign(pad_look, true)
     local correction = pc_y_sign and pad_y_sign and pc_y_sign * pad_y_sign or 1
 
     if SIS.settings.gamepad_invert_y then
