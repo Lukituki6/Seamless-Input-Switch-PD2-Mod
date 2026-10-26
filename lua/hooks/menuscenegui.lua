@@ -49,8 +49,18 @@ end
 
 function MenuSceneGui:update(t, dt, ...)
     local result = original_update(self, t, dt, ...)
+    local scene = managers and managers.menu_scene
 
-    if SIS.active_family ~= "gamepad" or not managers or not managers.menu_scene then
+    if not scene or not scene._sis_release_preview_grabs then
+        return result
+    end
+
+    if SIS.active_family ~= "gamepad" then
+        if scene._sis_controller_preview then
+            scene:_sis_release_preview_grabs()
+            scene._sis_controller_preview = nil
+        end
+
         return result
     end
 
@@ -59,22 +69,41 @@ function MenuSceneGui:update(t, dt, ...)
     local controller = wrapper and SIS:get_pad_controller(wrapper, true)
 
     if not controller then
+        if scene._sis_controller_preview then
+            scene:_sis_release_preview_grabs()
+            scene._sis_controller_preview = nil
+        end
+
         return result
     end
 
     local left_x, left_y, left_active = active_axis(raw_axis(controller, "left"))
     local right_x, right_y, right_active = active_axis(raw_axis(controller, "right"))
 
-    if left_active then
-        managers.menu_scene:controller_move(left_x * dt, left_y * dt)
-    else
-        managers.menu_scene:stop_controller_move()
+    if left_active or right_active then
+        scene:_sis_release_preview_grabs()
+        scene._sis_controller_preview = true
+    elseif scene._sis_controller_preview then
+        scene:_sis_release_preview_grabs()
+        scene._sis_controller_preview = nil
     end
 
-    if right_active then
-        managers.menu_scene:controller_zoom(right_x * dt, right_y * dt)
-    else
-        managers.menu_scene:stop_controller_zoom()
+    local ok, error_message = pcall(function()
+        if left_active and scene.controller_move then
+            scene:controller_move(left_x * dt, left_y * dt)
+        end
+
+        if right_active and scene.controller_zoom then
+            scene:controller_zoom(right_x * dt, right_y * dt)
+        end
+    end)
+
+    if scene._sis_controller_preview then
+        scene:_sis_release_preview_grabs()
+    end
+
+    if not ok then
+        error(error_message)
     end
 
     return result
