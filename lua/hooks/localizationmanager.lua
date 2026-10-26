@@ -27,6 +27,14 @@ local INPUT_ALIASES = {
     plus = "start",
     minus = "back",
     select = "back",
+    view = "back",
+    share = "back",
+    create = "back",
+    options = "start",
+    touchpad = "back",
+    touchpad_click = "back",
+    touchpad_press = "back",
+    touchpad_left = "back",
     l = "left_shoulder",
     r = "right_shoulder",
     zl = "left_trigger",
@@ -50,8 +58,15 @@ local PLAYSTATION_TEXT = {
     b = "[O]",
     x = "[SQ]",
     y = "[TRI]",
-    back = "[CREATE]",
+    back = "[BACK]",
     start = "[OPTIONS]",
+    options = "[OPTIONS]",
+    share = "[SHARE]",
+    create = "[CREATE]",
+    touchpad = "[TOUCHPAD]",
+    touchpad_click = "[TOUCHPAD]",
+    touchpad_press = "[TOUCHPAD]",
+    touchpad_left = "[TOUCHPAD]",
     left = "[LS]",
     right = "[RS]",
     left_shoulder = "[L1]",
@@ -107,8 +122,12 @@ local ACTION_MACROS = {
     BTN_CHANGE_PROFILE_LEFT = "menu_change_profile_left"
 }
 
-local function normalize_input_name(input_name)
+local function normalize_input_name(input_name, style)
     local key = tostring(input_name or "")
+
+    if style == "playstation" and PLAYSTATION_TEXT[key] then
+        return key
+    end
 
     return INPUT_ALIASES[key] or key
 end
@@ -157,7 +176,7 @@ local function input_for_connection(connection_name)
     local custom_input = SIS:get_custom_gamepad_binding(connection_name, pad_type)
 
     if custom_input then
-        return normalize_input_name(custom_input), pad_type
+        return custom_input, pad_type
     end
 
     local ok, connection = pcall(settings.get_connection, settings, connection_name)
@@ -169,7 +188,7 @@ local function input_for_connection(connection_name)
     local input_ok, input_names = pcall(connection.get_input_name_list, connection)
     local input_name = input_ok and input_names and input_names[1]
 
-    return input_name and normalize_input_name(input_name) or nil, pad_type
+    return input_name, pad_type
 end
 
 local function text_for_input(localization_manager, input_name, to_upper)
@@ -178,12 +197,13 @@ local function text_for_input(localization_manager, input_name, to_upper)
     end
 
     local style = SIS.settings.prompt_style
+    local normalized_input = normalize_input_name(input_name, style)
     local result
 
     if style == "playstation" then
-        result = PLAYSTATION_TEXT[normalize_input_name(input_name)]
+        result = PLAYSTATION_TEXT[normalized_input]
     elseif style == "xbox" and localization_manager.key_to_btn_text then
-        result = localization_manager:key_to_btn_text(normalize_input_name(input_name), to_upper, "xb1")
+        result = localization_manager:key_to_btn_text(normalized_input, to_upper, "xb1")
     end
 
     if result and to_upper and utf8 and utf8.to_upper then
